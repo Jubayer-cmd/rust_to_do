@@ -24,7 +24,7 @@ impl Database {
             "INSERT INTO tasks (title, done) VALUES (?1, ?2)",
             params![title, false],
         )?;
-        println!("Task '{}' added successfully!", title);
+        println!("✅ Task '{}' added successfully!", title);
         Ok(())
     }
 
@@ -44,9 +44,9 @@ impl Database {
             .conn
             .execute("UPDATE tasks SET done = 1 WHERE id = ?1", params![task_id])?;
         if updated == 0 {
-            println!("Task with ID {} not found.", task_id);
+            println!("❌ Task with ID {} not found.", task_id);
         } else {
-            println!("Task {} marked as done!", task_id);
+            println!("✅ Task marked as done!");
         }
         Ok(())
     }
@@ -56,9 +56,35 @@ impl Database {
             .conn
             .execute("DELETE FROM tasks WHERE id = ?1", params![task_id])?;
         if deleted == 0 {
-            println!("Task with ID {} not found.", task_id);
+            println!("❌ Task with ID {} not found.", task_id);
         } else {
-            println!("Task {} deleted successfully!", task_id);
+            println!("🗑️ Task deleted successfully!");
+            // Reset auto-increment counter to reuse IDs
+            self.reset_auto_increment()?;
+        }
+        Ok(())
+    }
+
+    fn reset_auto_increment(&self) -> Result<()> {
+        // Get the maximum ID from existing tasks
+        let max_id: Option<i32> = self.conn.query_row(
+            "SELECT MAX(id) FROM tasks",
+            [],
+            |row| row.get(0)
+        ).unwrap_or(None);
+
+        // Reset the auto-increment counter
+        if let Some(max_id) = max_id {
+            self.conn.execute(
+                "UPDATE sqlite_sequence SET seq = ?1 WHERE name = 'tasks'",
+                params![max_id]
+            )?;
+        } else {
+            // If no tasks exist, reset to 0
+            self.conn.execute(
+                "UPDATE sqlite_sequence SET seq = 0 WHERE name = 'tasks'",
+                []
+            )?;
         }
         Ok(())
     }
